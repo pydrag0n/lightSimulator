@@ -9,6 +9,7 @@ HGLRC hrc;
 
 #define WH 512
 #define WW 1024
+#define defLength 800
 
 typedef struct {
     float startX;
@@ -25,9 +26,100 @@ typedef struct {
     float b;
 } Color;
 
+typedef struct {
+    float x;
+    float y;
+    float width;
+    float height;
+} Rect;
+
+typedef struct {
+    float x;
+    float y;
+} Point;
+
+Point intersectionPoint;
 Color color1 = {1, 1, 1};
 
-Ray ray1 = {WW/2, WH/2, 0, 0, 100, 0};
+Ray ray1 = {WW/2, WH/2, 0, 0, defLength, 0};
+Rect rect = {300, 300, 50, 50};
+
+
+short checkRayRectangleIntersection(Ray *ray, Rect *rect, Point *intersectionPoint) {
+    float minX = rect->x;
+    float maxX = rect->x + rect->width;
+    float minY = rect->y;
+    float maxY = rect->y + rect->height;
+
+    float rayDirX = cos(ray->angle);
+    float rayDirY = sin(ray->angle);
+
+    float tMin = INFINITY; // наименьшее 
+
+    // Проверяем пересечение с левой границей
+    if (rayDirX != 0) {
+        float t = (minX - ray->startX) / rayDirX;
+        if (t >= 0 && t <= ray->length && t < tMin) {
+            float y = ray->startY + t * rayDirY;
+            if (y >= minY && y <= maxY) {
+                intersectionPoint->x = minX;
+                intersectionPoint->y = y;
+                tMin = t;
+            }
+        }
+    }
+
+    // Проверяем пересечение с правой границей
+    if (rayDirX != 0) {
+        float t = (maxX - ray->startX) / rayDirX;
+        if (t >= 0 && t <= ray->length && t < tMin) {
+            float y = ray->startY + t * rayDirY;
+            if (y >= minY && y <= maxY) {
+                intersectionPoint->x = maxX;
+                intersectionPoint->y = y;
+                tMin = t;
+            }
+        }
+    }
+
+    // Проверяем пересечение с верхней границей
+    if (rayDirY != 0) {
+        float t = (maxY - ray->startY) / rayDirY;
+        if (t >= 0 && t <= ray->length && t < tMin) {
+            float x = ray->startX + t * rayDirX;
+            if (x >= minX && x <= maxX) {
+                intersectionPoint->x = x;
+                intersectionPoint->y = maxY;
+                tMin = t;
+            }
+        }
+    }
+
+    // Проверяем пересечение с нижней границей
+    if (rayDirY != 0) {
+        float t = (minY - ray->startY) / rayDirY;
+        if (t >= 0 && t <= ray->length && t < tMin) {
+            float x = ray->startX + t * rayDirX;
+            if (x >= minX && x <= maxX) {
+                intersectionPoint->x = x;
+                intersectionPoint->y = minY;
+                tMin = t;
+            }
+        }
+    }
+
+    return (tMin != INFINITY) ? 1 : 0;
+}
+
+void drawRect(Rect *rect) {
+    glColor3f(1, 1, 0);
+    glBegin(GL_QUADS);
+    glVertex2i(rect->x, rect->y);
+    glVertex2i(rect->x+rect->width, rect->y);
+    glVertex2i(rect->x+rect->width, rect->y+rect->height);
+    glVertex2i(rect->x, rect->y+rect->height);
+    glEnd();
+}
 
 void drawRay(Ray *ray, Color *color) {
 
@@ -43,6 +135,17 @@ void drawRay(Ray *ray, Color *color) {
     glEnd();
 
 }
+
+void drawPoint(Point *p) {
+    float x = round(p->x * 100.0f) / 100.0f;
+    float y = round(p->y * 100.0f) / 100.0f;
+    glColor3f(1, 0, 0);
+    glPointSize(10);
+    glBegin(GL_POINTS);
+    glVertex2f(x, y);
+    glEnd();
+}
+
 void tick(int fps) {
     Sleep(1000/fps);
 }
@@ -50,17 +153,38 @@ void tick(int fps) {
 void draw(void) {
 
     if (GetAsyncKeyState(VK_LEFT) < 0) {
-        ray1.angle -= 0.1; // поворот влево
+        ray1.angle -= 0.01; // влево
     };
     if (GetAsyncKeyState(VK_RIGHT) < 0) {
-        ray1.angle += 0.1; // поворот вправо
+        ray1.angle += 0.01; // вправо
     };
 
-    // рассчитываем конечные координаты луча
+    // рассчитываем конечные корды луча
     ray1.endX = ray1.startX + ray1.length * cos(ray1.angle);
     ray1.endY = ray1.startY + ray1.length * sin(ray1.angle);
-    printf("%f", ray1.angle);
+    float num = ray1.angle;
+    short isColised = checkRayRectangleIntersection(&ray1, &rect, &intersectionPoint);
+    printf("%d\n || %.2f", isColised, num);
+    if (isColised>0) {
+        Color color2 = {1, 0, 0};
+        Ray ray2;
+        printf("Intersection point: (%f, %f)\n", intersectionPoint.x, intersectionPoint.y);
+        ray1.endX = intersectionPoint.x;
+        ray1.endY = intersectionPoint.y;
+        // ray2.startX = intersectionPoint.x;
+        // ray2.startY = intersectionPoint.y;
+        // ray2.length = defLength;
+        // ray2.angle = 0.0;
+        // ray2.endX = ray2.startX + ray2.length * cos(ray2.angle);
+        // ray2.endY = ray2.startY + ray2.length * sin(ray2.angle);
+        // drawRay(&ray2, &color2);
+    }
+
+    drawRect(&rect);
     drawRay(&ray1, &color1);
+    Point p = {ray1.endX, ray1.endY};
+    drawPoint(&p);
+
 }
 
 void R_Render(void)
