@@ -11,6 +11,9 @@ HGLRC hrc;
 #define WW 1024
 #define defLength 800
 
+const int rayCol = 64;
+
+
 typedef struct {
     float startX;
     float startY;
@@ -37,13 +40,12 @@ typedef struct {
     float x;
     float y;
 } Point;
-
+Ray rayList[100];
 Point intersectionPoint;
 Color color1 = {1, 1, 1};
 
-Ray ray1 = {WW/2, WH/2, 0, 0, defLength, 0};
+// Ray ray1 = {WW/2, WH/2, 0, 0, defLength, 0};
 Rect rect = {300, 300, 50, 50};
-
 
 short checkRayRectangleIntersection(Ray *ray, Rect *rect, Point *intersectionPoint) {
     float minX = rect->x;
@@ -54,7 +56,25 @@ short checkRayRectangleIntersection(Ray *ray, Rect *rect, Point *intersectionPoi
     float rayDirX = cos(ray->angle);
     float rayDirY = sin(ray->angle);
 
-    float tMin = INFINITY; // наименьшее 
+    float tMin = INFINITY;
+
+    // Check for division by zero
+    if (rayDirX == 0) {
+        if (ray->startX < minX || ray->startX > maxX) return 0;
+        float t = (maxY - ray->startY) / rayDirY;
+        if (t >= 0 && t <= ray->length) {
+            intersectionPoint->x = ray->startX;
+            intersectionPoint->y = maxY;
+            return 1;
+        }
+        t = (minY - ray->startY) / rayDirY;
+        if (t >= 0 && t <= ray->length) {
+            intersectionPoint->x = ray->startX;
+            intersectionPoint->y = minY;
+            return 1;
+        }
+        return 0;
+    }
 
     // Проверяем пересечение с левой границей
     if (rayDirX != 0) {
@@ -110,7 +130,6 @@ short checkRayRectangleIntersection(Ray *ray, Rect *rect, Point *intersectionPoi
 
     return (tMin != INFINITY) ? 1 : 0;
 }
-
 void drawRect(Rect *rect) {
     glColor3f(1, 1, 0);
     glBegin(GL_QUADS);
@@ -129,6 +148,7 @@ void drawRay(Ray *ray, Color *color) {
     glVertex2f(ray->startX, ray->startY);
     glEnd();
 
+    // glLineWidth(5);
     glBegin(GL_LINES);
     glVertex2f(ray->startX, ray->startY);
     glVertex2f(ray->endX, ray->endY);
@@ -147,44 +167,65 @@ void drawPoint(Point *p) {
 }
 
 void tick(int fps) {
-    Sleep(1000/fps);
+    Sleep(1000/fps); 
+}
+
+void drawRayList(void) {
+
+    float defGap = -1.5;
+    for(int i = 0; i<rayCol; i++) {
+        float gap = 0.04;
+        rayList[i].startX = WW/2;
+        rayList[i].startY = WH/2;
+        rayList[i].angle = defGap;
+        rayList[i].length = 800;
+        rayList[i].endX = rayList[i].startX + rayList[i].length * cos(rayList[i].angle);
+        rayList[i].endY = rayList[i].startY + rayList[i].length * sin(rayList[i].angle);
+        defGap+=gap;
+    }
 }
 
 void draw(void) {
+    for(int i = 0; i<rayCol; i++) {
+        // Update ray positions
+        if (GetAsyncKeyState(VK_LEFT) < 0) {
+            rayList[i].angle -= 0.01; // влево
+        };
 
-    if (GetAsyncKeyState(VK_LEFT) < 0) {
-        ray1.angle -= 0.01; // влево
-    };
-    if (GetAsyncKeyState(VK_RIGHT) < 0) {
-        ray1.angle += 0.01; // вправо
-    };
+        if (GetAsyncKeyState(VK_RIGHT) < 0) {
+            rayList[i].angle += 0.01; // вправо
+        };
+        // W: 0x57 A:0x41 S:0x53 D:0x44
+        if (GetAsyncKeyState(0x57) < 0) {
+            rayList[i].startY -= 1;
+        }
+        if (GetAsyncKeyState(0x41) < 0) {
+            rayList[i].startX -= 1;
+        }
+        if (GetAsyncKeyState(0x53) < 0) {
+            rayList[i].startY += 1;
+        }
+        if (GetAsyncKeyState(0x44) < 0) {
+            rayList[i].startX += 1;
+        }
 
-    // рассчитываем конечные корды луча
-    ray1.endX = ray1.startX + ray1.length * cos(ray1.angle);
-    ray1.endY = ray1.startY + ray1.length * sin(ray1.angle);
-    float num = ray1.angle;
-    short isColised = checkRayRectangleIntersection(&ray1, &rect, &intersectionPoint);
-    printf("%d\n || %.2f", isColised, num);
-    if (isColised>0) {
-        Color color2 = {1, 0, 0};
-        Ray ray2;
-        printf("Intersection point: (%f, %f)\n", intersectionPoint.x, intersectionPoint.y);
-        ray1.endX = intersectionPoint.x;
-        ray1.endY = intersectionPoint.y;
-        // ray2.startX = intersectionPoint.x;
-        // ray2.startY = intersectionPoint.y;
-        // ray2.length = defLength;
-        // ray2.angle = 0.0;
-        // ray2.endX = ray2.startX + ray2.length * cos(ray2.angle);
-        // ray2.endY = ray2.startY + ray2.length * sin(ray2.angle);
-        // drawRay(&ray2, &color2);
+        // Calculate end points of the ray
+        rayList[i].endX = rayList[i].startX + rayList[i].length * cos(rayList[i].angle);
+        rayList[i].endY = rayList[i].startY + rayList[i].length * sin(rayList[i].angle);
+
+        // Check intersection
+        short isColised = checkRayRectangleIntersection(&rayList[i], &rect, &intersectionPoint);
+        if (isColised > 0) {
+            Color color2 = {1, 0, 0};
+            rayList[i].endX = intersectionPoint.x;
+            rayList[i].endY = intersectionPoint.y;
+        }
+
+        drawRay(&rayList[i], &color1);
+        Point p = {rayList[i].endX, rayList[i].endY};
+        drawPoint(&p);
     }
-
     drawRect(&rect);
-    drawRay(&ray1, &color1);
-    Point p = {ray1.endX, ray1.endY};
-    drawPoint(&p);
-
 }
 
 void R_Render(void)
@@ -192,13 +233,14 @@ void R_Render(void)
 
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-    tick(60);
+    tick(120);
     draw();
     SwapBuffers(hdc);
 }
 
 void GL_Init(void)
 {
+    drawRayList();
     PIXELFORMATDESCRIPTOR pfd;
     int iFormat;
 
