@@ -13,7 +13,7 @@ const float rayGap = 0.01;
 // ------------------------
 int startY = WH/2;
 int startX = WW/2;
-int length = 800;
+int length = 1000;
 float angle = 0.0;
 float endX;
 float endY;
